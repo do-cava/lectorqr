@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lector de marchamos - DOP Cava</title>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+
+    body {
+      background: #0f172a;
+      color: #f8fafc;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 15px;
+    }
+
+    .container {
+      background: #1e293b;
+      padding: 16px;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+      width: 100%;
+      max-width: 480px;
+      text-align: center;
+    }
+
+    /* TÍTULO */
+    h1.titulo {
+      font-size: clamp(1.15rem, 4.8vw, 1.5rem);
+      font-weight: 900;
+      color: #facc15;
+      line-height: 1.2;
+      margin-bottom: 14px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      text-shadow: 0 2px 12px rgba(250, 204, 21, 0.35);
+    }
+
+    /* VIDEO */
+    .video-container {
+      position: relative;
+      width: 100%;
+      height: 200px;
+      background: #000;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 10px;
+      border: 2px solid #334155;
+    }
+
+    video#video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.15s ease;
+    }
+
+    .scanner-laser {
+      position: absolute;
+      top: 50%;
+      left: 10%;
+      width: 80%;
+      height: 2px;
+      background: #ef4444;
+      box-shadow: 0 0 8px #ef4444;
+      animation: scan 2s infinite ease-in-out;
+      pointer-events: none;
+    }
+
+    @keyframes scan {
+      0%, 100% { top: 20%; }
+      50% { top: 80%; }
+    }
+
+    /* ZOOM */
+    .zoom-control {
+      margin-bottom: 10px;
+      font-size: 0.8rem;
+      color: #94a3b8;
+    }
+
+    .zoom-control input[type=range] {
+      width: 80%;
+      cursor: pointer;
+      accent-color: #38bdf8;
+      margin-top: 3px;
+    }
+
+    /* RESULTADO */
+    .result-box {
+      background: #0f172a;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #334155;
+      text-align: left;
+      word-break: break-all;
+      margin-bottom: 10px;
+    }
+
+    .result-label { font-size: 0.75rem; color: #94a3b8; margin-bottom: 2px; }
+    .result-text { font-size: 0.9rem; color: #38bdf8; min-height: 18px; }
+    .extracted-text { font-size: 0.95rem; color: #4ade80; font-weight: bold; margin-top: 3px; }
+
+    /* BOTONES */
+    .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .btn-row { display: flex; gap: 8px; }
+    .btn-row .btn { flex: 1; }
+
+    .btn {
+      color: #fff;
+      border: none;
+      padding: 11px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.85rem;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+      letter-spacing: 0.2px;
+      width: 100%;
+    }
+
+    .btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      filter: brightness(1.1);
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    }
+
+    .btn:active:not(:disabled) { transform: translateY(0); }
+
+    .btn:disabled {
+      background: #475569 !important;
+      cursor: not-allowed;
+      opacity: 0.55;
+      box-shadow: none;
+    }
+
+    .btn-extract   { background: linear-gradient(135deg, #22c55e, #16a34a); }
+    .btn-download  { background: linear-gradient(135deg, #0284c7, #0369a1); }
+    .btn-url       { background: linear-gradient(135deg, #7c3aed, #6d28d9); }
+    .btn-clear     { background: linear-gradient(135deg, #dc2626, #b91c1c); }
+    .btn-gps       { background: linear-gradient(135deg, #0d9488, #0f766e); }
+    .btn-pause     { background: linear-gradient(135deg, #6366f1, #4f46e5); }
+    .btn-mail      { background: linear-gradient(135deg, #ea580c, #c2410c); }
+    .btn-foto      { background: linear-gradient(135deg, #334155, #475569); }
+
+    /* GPS */
+    .gps-info {
+      font-size: 0.75rem;
+      color: #94a3b8;
+      margin-bottom: 10px;
+      word-break: break-word;
+      background: #0f172a;
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid #334155;
+    }
+    .gps-info a { color: #38bdf8; }
+
+    /* FOTOS */
+    .fotos-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .foto-slot { display: flex; flex-direction: column; gap: 6px; }
+
+    .preview {
+      width: 100%;
+      height: 90px;
+      object-fit: cover;
+      border-radius: 10px;
+      border: 1px solid #334155;
+    }
+
+    /* COMENTARIOS */
+    .comentarios {
+      width: 100%;
+      background: #0f172a;
+      color: #f8fafc;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 0.85rem;
+      resize: vertical;
+      margin-bottom: 10px;
+      font-family: inherit;
+    }
+    .comentarios::placeholder { color: #64748b; }
+    .comentarios:focus {
+      outline: none;
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+    }
+
+    /* HISTORIAL */
+    .history-box {
+      margin-top: 8px;
+      background: #0f172a;
+      padding: 8px;
+      border-radius: 10px;
+      border: 1px solid #334155;
+      max-height: 150px;
+      overflow-y: auto;
+      text-align: left;
+      font-size: 0.8rem;
+    }
+
+    .history-item {
+      padding: 5px 0;
+      border-bottom: 1px solid #1e293b;
+      color: #cbd5e1;
+    }
+    .history-item:last-child { border-bottom: none; }
+    .history-item .h-code { color: #4ade80; font-weight: bold; }
+    .history-item .h-meta { display: block; font-size: 0.7rem; color: #94a3b8; margin-top: 2px; }
+    .history-item a { color: #38bdf8; }
+
+    /* MODAL FOTO */
+    .photo-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.92);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      padding: 15px;
+    }
+
+    .photo-modal.active { display: flex; }
+
+    .photo-modal-content {
+      background: #1e293b;
+      border-radius: 16px;
+      padding: 15px;
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+    }
+
+    .photo-modal-content h2 {
+      font-size: 1rem;
+      color: #38bdf8;
+      text-align: center;
+    }
+
+    .photo-modal-content video {
+      width: 100%;
+      max-height: 60vh;
+      border-radius: 12px;
+      background: #000;
+      object-fit: contain;
+    }
+
+    .photo-modal-btns { display: flex; gap: 8px; }
+    .photo-modal-btns .btn { flex: 1; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1 class="titulo">LECTOR DE MARCHAMOS DE LA DOP CAVA</h1>
+
+    <div class="video-container">
+      <video id="video" playsinline muted autoplay></video>
+      <div class="scanner-laser"></div>
+    </div>
+
+    <div class="zoom-control" id="zoomContainer">
+      <label for="zoomRange">🔍 Zoom: <span id="zoomValue">1.0</span>x</label><br>
+      <input type="range" id="zoomRange" min="1" max="5" step="0.1" value="1" oninput="cambiarZoom(this.value)">
+    </div>
+
+    <div class="result-box">
+      <div class="result-label">QR Detectado:</div>
+      <div id="rawResult" class="result-text">Apunta a un código QR...</div>
+
+      <div class="result-label" style="margin-top:6px;">Texto extraído (tras '?'):</div>
+      <div id="extractedResult" class="extracted-text">Ninguno</div>
+    </div>
+
+    <div class="btn-group">
+      <div class="btn-row">
+        <button id="openUrlBtn" class="btn btn-url" onclick="abrirURL()" disabled>🌐 Abrir URL</button>
+        <button id="clearBtn" class="btn btn-clear" onclick="limpiarLectura()">🧹 Limpiar</button>
+      </div>
+      <div class="btn-row">
+        <button id="gpsBtn" class="btn btn-gps" onclick="obtenerUbicacion()">📍 GPS</button>
+        <button id="pauseBtn" class="btn btn-pause" onclick="togglePausa()">⏸️ Pausar</button>
+      </div>
+      <button id="saveBtn" class="btn btn-extract" onclick="saveExtractedData()" disabled>💾 Guardar parámetro</button>
+    </div>
+
+    <div class="gps-info" id="gpsInfo">Sin ubicación registrada</div>
+
+    <div class="fotos-grid">
+      <div class="foto-slot">
+        <button class="btn btn-foto" onclick="abrirModalFoto(1)">📸 Botella 1</button>
+        <img id="preview1" class="preview" alt="Foto botella 1" hidden>
+      </div>
+      <div class="foto-slot">
+        <button class="btn btn-foto" onclick="abrirModalFoto(2)">📸 Botella 2</button>
+        <img id="preview2" class="preview" alt="Foto botella 2" hidden>
+      </div>
+    </div>
+
+    <textarea id="comentarios" class="comentarios" rows="3" placeholder="Comentarios a añadir al correo..."></textarea>
+
+    <div class="btn-row" style="gap:8px;">
+      <button id="emailBtn" class="btn btn-mail" onclick="enviarCorreo()" disabled>📧 Correo</button>
+      <button id="downloadBtn" class="btn btn-download" onclick="downloadCSV()" disabled>⬇️ CSV</button>
+    </div>
+
+    <div class="history-box" id="historyBox">
+      <div class="result-label">Historial de guardados (0):</div>
+    </div>
+  </div>
+
+  <canvas id="canvas" style="display:none;"></canvas>
+
+  <!-- Modal cámara para fotos -->
+  <div id="photoModal" class="photo-modal">
+    <div class="photo-modal-content">
+      <h2 id="photoModalTitle">Foto botella</h2>
+      <video id="photoVideo" playsinline autoplay muted></video>
+      <canvas id="photoCanvas" style="display:none;"></canvas>
+      <div class="photo-modal-btns">
+        <button class="btn btn-extract" onclick="capturarFoto()">📸 Capturar</button>
+        <button class="btn btn-clear" onclick="cerrarModalFoto()">✖ Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* ==========================================================
+       CONFIGURACIÓN
+       ========================================================== */
+    const EMAIL_DESTINO = "davidpujol@cava.wine";   // <-- Cambia aquí el correo destino
+
+    /* ==========================================================
+       REFERENCIAS AL DOM
+       ========================================================== */
+    const video = document.getElementById('video');
+    const canvasElement = document.getElementById('canvas');
+    const canvas = canvasElement.getContext('2d');
+    const rawResultEl = document.getElementById('rawResult');
+    const extractedResultEl = document.getElementById('extractedResult');
+    const saveBtn = document.getElementById('saveBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const emailBtn = document.getElementById('emailBtn');
+    const openUrlBtn = document.getElementById('openUrlBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const gpsInfo = document.getElementById('gpsInfo');
+    const historyBox = document.getElementById('historyBox');
+    const zoomContainer = document.getElementById('zoomContainer');
+    const zoomRange = document.getElementById('zoomRange');
+    const zoomValue = document.getElementById('zoomValue');
+    const comentariosEl = document.getElementById('comentarios');
+    const preview1 = document.getElementById('preview1');
+    const preview2 = document.getElementById('preview2');
+
+    /* ==========================================================
+       ESTADO
+       ========================================================== */
+    let currentRawData = "";
+    let currentExtractedData = "";
+    let savedList = [];
+    let videoTrack = null;
+    let scanPaused = false;
+    let currentLocation = null;
+    let foto1File = null;
+    let foto2File = null;
+
+    let zoomLevel = 1;
+    let nativeZoomSupported = false;
+
+    /* ==========================================================
+       CÁMARA PRINCIPAL
+       ========================================================== */
+    async function iniciarCamara() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" }
+        });
+        video.srcObject = stream;
+        video.setAttribute("playsinline", true);
+        video.play();
+
+        videoTrack = stream.getVideoTracks()[0];
+
+        if (videoTrack && typeof videoTrack.getCapabilities === "function") {
+          const capacidades = videoTrack.getCapabilities();
+          if (capacidades.zoom && typeof capacidades.zoom.max === "number" &&
+              capacidades.zoom.max > capacidades.zoom.min) {
+            nativeZoomSupported = true;
+            zoomRange.min = capacidades.zoom.min;
+            zoomRange.max = capacidades.zoom.max;
+            zoomRange.step = capacidades.zoom.step || 0.1;
+            zoomRange.value = capacidades.zoom.min;
+            zoomLevel = capacidades.zoom.min;
+          } else {
+            nativeZoomSupported = false;
+            zoomRange.min = 1;
+            zoomRange.max = 5;
+            zoomRange.step = 0.1;
+            zoomRange.value = 1;
+            zoomLevel = 1;
+          }
+        } else {
+          nativeZoomSupported = false;
+          zoomRange.min = 1;
+          zoomRange.max = 5;
+          zoomRange.step = 0.1;
+          zoomRange.value = 1;
+          zoomLevel = 1;
+        }
+
+        zoomValue.innerText = parseFloat(zoomLevel).toFixed(1);
+        zoomContainer.style.display = "block";
+
+        requestAnimationFrame(escanearQR);
+      } catch (error) {
+        alert("Error al acceder a la cámara: " + error.message);
+      }
+    }
+
+    async function cambiarZoom(valor) {
+      zoomLevel = parseFloat(valor);
+      zoomValue.innerText = zoomLevel.toFixed(1);
+
+      if (nativeZoomSupported && videoTrack) {
+        try {
+          await videoTrack.applyConstraints({
+            advanced: [{ zoom: zoomLevel }]
+          });
+          video.style.transform = "none";
+          return;
+        } catch (err) {
+          console.log("El zoom nativo falló, cambiando a zoom digital", err);
+          nativeZoomSupported = false;
+        }
+      }
+
+      // Zoom digital sobre el vídeo
+      video.style.transform = `scale(${zoomLevel})`;
+    }
+
+    /* ==========================================================
+       ESCANEO QR
+       ========================================================== */
+    function escanearQR() {
+      if (!scanPaused && video.readyState === video.HAVE_ENOUGH_DATA) {
+        canvasElement.width = video.videoWidth;
+        canvasElement.height = video.videoHeight;
+
+        if (!nativeZoomSupported && zoomLevel > 1) {
+          const sw = video.videoWidth / zoomLevel;
+          const sh = video.videoHeight / zoomLevel;
+          const sx = (video.videoWidth - sw) / 2;
+          const sy = (video.videoHeight - sh) / 2;
+          canvas.drawImage(video, sx, sy, sw, sh, 0, 0, canvasElement.width, canvasElement.height);
+        } else {
+          canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+        }
+
+        const imageData = canvas.getImageData(0, 0, canvasElement.width, canvasElement.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: "dontInvert",
+        });
+
+        if (code && code.data !== currentRawData) {
+          procesarLectura(code.data);
+        }
+      }
+      requestAnimationFrame(escanearQR);
+    }
+
+    function procesarLectura(datos) {
+      currentRawData = datos;
+      rawResultEl.innerText = currentRawData;
+
+      if (currentRawData.includes('?')) {
+        currentExtractedData = currentRawData.split('?')[1];
+      } else {
+        currentExtractedData = currentRawData;
+      }
+
+      extractedResultEl.innerText = currentExtractedData;
+      actualizarBotones();
+    }
+
+    /* ==========================================================
+       BOTONES DE LECTURA
+       ========================================================== */
+    function actualizarBotones() {
+      const hayLectura = !!currentExtractedData;
+      saveBtn.disabled = !hayLectura;
+      openUrlBtn.disabled = !/^https?:\/\//i.test(currentRawData);
+      emailBtn.disabled = !(hayLectura || savedList.length > 0);
+      downloadBtn.disabled = savedList.length === 0;
+    }
+
+    function abrirURL() {
+      if (!/^https?:\/\//i.test(currentRawData)) {
+        alert("El contenido del QR no es una URL válida.");
+        return;
+      }
+      window.open(currentRawData, "_blank", "noopener,noreferrer");
+    }
+
+    function limpiarLectura() {
+      currentRawData = "";
+      currentExtractedData = "";
+      rawResultEl.innerText = "Apunta a un código QR...";
+      extractedResultEl.innerText = "Ninguno";
+      scanPaused = true;
+      actualizarBotonPausa();
+      actualizarBotones();
+    }
+
+    function togglePausa() {
+      scanPaused = !scanPaused;
+      actualizarBotonPausa();
+    }
+
+    function actualizarBotonPausa() {
+      pauseBtn.innerText = scanPaused ? "▶️ Reanudar" : "⏸️ Pausar";
+    }
+
+    /* ==========================================================
+       GPS
+       ========================================================== */
+    function obtenerUbicacion() {
+      if (!navigator.geolocation) {
+        alert("Este dispositivo no soporta geolocalización.");
+        return;
+      }
+      gpsInfo.innerText = "Obteniendo ubicación...";
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          currentLocation = {
+            lat: pos.coords.latitude,
+            lon: pos.coords.longitude,
+            acc: pos.coords.accuracy
+          };
+          const lat = currentLocation.lat.toFixed(6);
+          const lon = currentLocation.lon.toFixed(6);
+          const acc = Math.round(currentLocation.acc);
+          gpsInfo.innerHTML =
+            `📍 ${lat}, ${lon} (±${acc} m) · ` +
+            `<a href="https://www.google.com/maps?q=${lat},${lon}" target="_blank" rel="noopener">Ver en mapa</a>`;
+        },
+        (err) => {
+          gpsInfo.innerText = "No se pudo obtener la ubicación.";
+          alert("Error de geolocalización: " + err.message);
+        },
+        { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+      );
+    }
+
+    /* ==========================================================
+       GUARDAR LECTURA
+       ========================================================== */
+    function saveExtractedData() {
+      if (!currentExtractedData) return;
+
+      savedList.push({
+        code: currentExtractedData,
+        raw: currentRawData,
+        fecha: new Date().toISOString(),
+        lat: currentLocation ? currentLocation.lat : "",
+        lon: currentLocation ? currentLocation.lon : "",
+        acc: currentLocation ? Math.round(currentLocation.acc) : "",
+        comentario: comentariosEl.value.trim()
+      });
+
+      renderHistorial();
+      actualizarBotones();
+    }
+
+    function renderHistorial() {
+      historyBox.innerHTML = `<div class="result-label">Historial de guardados (${savedList.length}):</div>`;
+
+      savedList.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.className = 'history-item';
+
+        const hora = new Date(item.fecha).toLocaleString('es-ES');
+        let meta = hora;
+        if (item.lat !== "") {
+          meta += ` · <a href="https://www.google.com/maps?q=${item.lat},${item.lon}" target="_blank" rel="noopener">📍 Ver ubicación</a>`;
+        }
+
+        div.innerHTML = `<strong>${index + 1}.</strong> ` +
+                        `<span class="h-code">${escapeHtml(item.code)}</span>` +
+                        `<span class="h-meta">${meta}</span>`;
+        historyBox.appendChild(div);
+      });
+    }
+
+    /* ==========================================================
+       FOTOS - CÁMARA EN VIVO
+       ========================================================== */
+    let photoStream = null;
+    let photoStreamOwned = false;
+    let photoTargetSlot = 1;
+
+    async function abrirModalFoto(slot) {
+      photoTargetSlot = slot;
+      const modal = document.getElementById('photoModal');
+      const pv = document.getElementById('photoVideo');
+      document.getElementById('photoModalTitle').innerText = `Foto botella ${slot}`;
+      modal.classList.add('active');
+
+      // Pausamos el escaneo principal para no competir por la cámara
+      scanPaused = true;
+      actualizarBotonPausa();
+
+      try {
+        photoStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment' }
+        });
+        photoStreamOwned = true;
+        pv.srcObject = photoStream;
+        await pv.play();
+      } catch (e) {
+        // Fallback: reutilizar el stream principal
+        if (video.srcObject) {
+          photoStream = video.srcObject;
+          photoStreamOwned = false;
+          pv.srcObject = photoStream;
+          await pv.play().catch(() => {});
+        } else {
+          alert('No se pudo abrir la cámara: ' + e.message);
+          cerrarModalFoto();
+        }
+      }
+    }
+
+    function cerrarModalFoto() {
+      const modal = document.getElementById('photoModal');
+      modal.classList.remove('active');
+      const pv = document.getElementById('photoVideo');
+      pv.pause();
+      pv.srcObject = null;
+
+      if (photoStream && photoStreamOwned) {
+        photoStream.getTracks().forEach(t => t.stop());
+      }
+      photoStream = null;
+      photoStreamOwned = false;
+
+      scanPaused = false;
+      actualizarBotonPausa();
+    }
+
+    function capturarFoto() {
+      const pv = document.getElementById('photoVideo');
+      const pc = document.getElementById('photoCanvas');
+
+      if (!pv.videoWidth || !pv.videoHeight) {
+        alert('La cámara aún no está lista. Espera un momento.');
+        return;
+      }
+
+      pc.width = pv.videoWidth;
+      pc.height = pv.videoHeight;
+      pc.getContext('2d').drawImage(pv, 0, 0);
+
+      pc.toBlob((blob) => {
+        if (!blob) {
+          alert('No se pudo capturar la foto.');
+          return;
+        }
+
+        const file = new File([blob], `botella_${photoTargetSlot}.jpg`, { type: 'image/jpeg' });
+        const previewEl = photoTargetSlot === 1 ? preview1 : preview2;
+
+        if (photoTargetSlot === 1) foto1File = file;
+        else foto2File = file;
+
+        if (previewEl.dataset.url) URL.revokeObjectURL(previewEl.dataset.url);
+        const url = URL.createObjectURL(blob);
+        previewEl.src = url;
+        previewEl.dataset.url = url;
+        previewEl.hidden = false;
+
+        cerrarModalFoto();
+      }, 'image/jpeg', 0.85);
+    }
+
+    /* ==========================================================
+       CSV
+       ========================================================== */
+    function csvEscape(valor) {
+      const s = (valor === null || valor === undefined) ? "" : String(valor);
+      return '"' + s.replace(/"/g, '""') + '"';
+    }
+
+    function downloadCSV() {
+      if (savedList.length === 0) return;
+
+      const cabeceras = ["Fecha", "Codigo", "URL_QR", "Latitud", "Longitud", "Precision_m", "Comentario"];
+      const filas = savedList.map(it => [
+        new Date(it.fecha).toLocaleString('es-ES'),
+        it.code,
+        it.raw,
+        it.lat,
+        it.lon,
+        it.acc,
+        it.comentario
+      ]);
+
+      const csv = "\uFEFF" + [cabeceras, ...filas]
+        .map(fila => fila.map(csvEscape).join(","))
+        .join("\r\n");
+
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `historial_marchamos_${Date.now()}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }
+
+    /* ==========================================================
+       CORREO ELECTRÓNICO
+       ========================================================== */
+    function construirListaParaCorreo() {
+      const lista = [...savedList];
+
+      if (currentExtractedData && !savedList.some(it => it.code === currentExtractedData)) {
+        lista.push({
+          code: currentExtractedData,
+          raw: currentRawData,
+          fecha: new Date().toISOString(),
+          lat: currentLocation ? currentLocation.lat : "",
+          lon: currentLocation ? currentLocation.lon : "",
+          acc: currentLocation ? Math.round(currentLocation.acc) : "",
+          comentario: ""
+        });
+      }
+      return lista;
+    }
+
+    function construirCuerpoCorreo(lista) {
+      const lineas = [];
+      lineas.push("LECTOR DE MARCHAMOS - DOP CAVA");
+      lineas.push("Fecha de envío: " + new Date().toLocaleString('es-ES'));
+      lineas.push("");
+      lineas.push("CÓDIGOS QR LEÍDOS:");
+      lineas.push("--------------------------------------------------");
+
+      if (lista.length === 0) {
+        lineas.push("  (ninguno)");
+      } else {
+        lista.forEach((it, i) => {
+          lineas.push(`${i + 1}. Código: ${it.code}`);
+          lineas.push(`   Fecha: ${new Date(it.fecha).toLocaleString('es-ES')}`);
+          if (it.raw && it.raw !== it.code) {
+            lineas.push(`   URL del QR: ${it.raw}`);
+          }
+          if (it.lat !== "" && it.lat !== undefined) {
+            lineas.push(`   Ubicación: ${it.lat}, ${it.lon} (±${it.acc} m)`);
+            lineas.push(`   Mapa: https://www.google.com/maps?q=${it.lat},${it.lon}`);
+          }
+          if (it.comentario) {
+            lineas.push(`   Comentario: ${it.comentario}`);
+          }
+          lineas.push("");
+        });
+      }
+
+      if (currentLocation) {
+        lineas.push("UBICACIÓN ACTUAL:");
+        lineas.push(`  ${currentLocation.lat.toFixed(6)}, ${currentLocation.lon.toFixed(6)} (±${Math.round(currentLocation.acc)} m)`);
+        lineas.push(`  https://www.google.com/maps?q=${currentLocation.lat},${currentLocation.lon}`);
+        lineas.push("");
+      }
+
+      lineas.push("COMENTARIOS:");
+      lineas.push("--------------------------------------------------");
+      lineas.push(comentariosEl.value.trim() || "(sin comentarios)");
+
+      return lineas.join("\n");
+    }
+
+    function descargarArchivo(file, nombre) {
+      const url = URL.createObjectURL(file);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = nombre;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }
+
+    async function enviarCorreo() {
+      const lista = construirListaParaCorreo();
+
+      if (lista.length === 0) {
+        alert("No hay ningún código QR leído para enviar.");
+        return;
+      }
+
+      const asunto = `Marchamos DOP Cava - ${lista.length} lectura(s) - ${new Date().toLocaleDateString('es-ES')}`;
+      const cuerpo = construirCuerpoCorreo(lista);
+
+      const files = [];
+      if (foto1File) files.push(new File([foto1File], "botella_1.jpg", { type: foto1File.type || "image/jpeg" }));
+      if (foto2File) files.push(new File([foto2File], "botella_2.jpg", { type: foto2File.type || "image/jpeg" }));
+
+      if (files.length > 0 && navigator.canShare && navigator.canShare({ files })) {
+        try {
+          await navigator.share({
+            files: files,
+            title: "Lector de marchamos - DOP Cava",
+            text: cuerpo
+          });
+          return;
+        } catch (err) {
+          if (err && err.name === "AbortError") return;
+        }
+      }
+
+      if (files.length > 0) {
+        alert("Tu navegador no permite adjuntar las fotos automáticamente.\n\nSe abrirá tu aplicación de correo con el texto y se descargarán las fotos para que las adjuntes manualmente.");
+        descargarArchivo(files[0], "botella_1.jpg");
+        if (files.length > 1) descargarArchivo(files[1], "botella_2.jpg");
+      }
+
+      const mailto = `mailto:${EMAIL_DESTINO}` +
+        `?subject=${encodeURIComponent(asunto)}` +
+        `&body=${encodeURIComponent(cuerpo)}`;
+
+      window.location.href = mailto;
+    }
+
+    /* ==========================================================
+       UTILIDADES
+       ========================================================== */
+    function escapeHtml(texto) {
+      return String(texto)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    /* ==========================================================
+       ARRANQUE
+       ========================================================== */
+    actualizarBotonPausa();
+    actualizarBotones();
+    iniciarCamara();
+  </script>
+</body>
+</html>

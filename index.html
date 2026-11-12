@@ -2,7 +2,8 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Lector QR - Extractor de Parámetros</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lector QR - Extractor con Zoom</title>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
   <style>
     * {
@@ -20,12 +21,12 @@
       align-items: center;
       justify-content: center;
       min-height: 100vh;
-      padding: 20px;
+      padding: 15px;
     }
 
     .container {
       background: #1e293b;
-      padding: 20px;
+      padding: 15px;
       border-radius: 16px;
       box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
       width: 100%;
@@ -34,19 +35,19 @@
     }
 
     h1 {
-      font-size: 1.4rem;
-      margin-bottom: 15px;
+      font-size: 1.3rem;
+      margin-bottom: 10px;
       color: #38bdf8;
     }
 
     .video-container {
       position: relative;
       width: 100%;
-      height: 250px;
+      height: 240px;
       background: #000;
       border-radius: 12px;
       overflow: hidden;
-      margin-bottom: 15px;
+      margin-bottom: 10px;
       border: 2px solid #334155;
     }
 
@@ -65,6 +66,7 @@
       background: #ef4444;
       box-shadow: 0 0 8px #ef4444;
       animation: scan 2s infinite ease-in-out;
+      pointer-events: none;
     }
 
     @keyframes scan {
@@ -72,65 +74,69 @@
       50% { top: 80%; }
     }
 
+    .zoom-control {
+      margin-bottom: 10px;
+      font-size: 0.85rem;
+      color: #94a3b8;
+    }
+
+    .zoom-control input {
+      width: 80%;
+      cursor: pointer;
+    }
+
     .result-box {
       background: #0f172a;
-      padding: 12px;
+      padding: 10px;
       border-radius: 8px;
       border: 1px solid #334155;
       text-align: left;
       word-break: break-all;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
     }
 
     .result-label {
-      font-size: 0.8rem;
+      font-size: 0.75rem;
       color: #94a3b8;
-      margin-bottom: 4px;
+      margin-bottom: 2px;
     }
 
     .result-text {
-      font-size: 0.95rem;
+      font-size: 0.9rem;
       color: #38bdf8;
-      min-height: 20px;
+      min-height: 18px;
     }
 
     .extracted-text {
-      font-size: 1rem;
+      font-size: 0.95rem;
       color: #4ade80;
       font-weight: bold;
-      margin-top: 5px;
+      margin-top: 3px;
     }
 
     .btn-group {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 6px;
     }
 
     .btn {
       color: white;
       border: none;
-      padding: 10px 15px;
+      padding: 10px;
       border-radius: 8px;
       cursor: pointer;
       font-weight: bold;
       width: 100%;
       transition: background 0.2s;
+      font-size: 0.9rem;
     }
 
-    .btn-extract {
-      background: #22c55e;
-    }
-    .btn-extract:hover {
-      background: #16a34a;
-    }
+    .btn-extract { background: #22c55e; }
+    .btn-extract:hover { background: #16a34a; }
 
-    .btn-download {
-      background: #0284c7;
-    }
-    .btn-download:hover {
-      background: #0369a1;
-    }
+    .btn-download { background: #0284c7; }
+    .btn-download:hover { background: #0369a1; }
 
     .btn:disabled {
       background: #475569;
@@ -138,19 +144,19 @@
     }
 
     .history-box {
-      margin-top: 15px;
+      margin-top: 10px;
       background: #0f172a;
-      padding: 10px;
+      padding: 8px;
       border-radius: 8px;
       border: 1px solid #334155;
-      max-height: 120px;
+      max-height: 100px;
       overflow-y: auto;
       text-align: left;
-      font-size: 0.85rem;
+      font-size: 0.8rem;
     }
 
     .history-item {
-      padding: 4px 0;
+      padding: 3px 0;
       border-bottom: 1px solid #1e293b;
       color: #cbd5e1;
     }
@@ -159,24 +165,30 @@
 <body>
 
   <div class="container">
-    <h1>🔍 Extractor de Parámetros QR</h1>
+    <h1>🔍 Lector QR con Zoom</h1>
     
     <div class="video-container">
       <video id="video" playsinline></video>
       <div class="scanner-laser"></div>
     </div>
 
+    <!-- Control de Zoom (aparece si la cámara del móvil lo soporta) -->
+    <div class="zoom-control" id="zoomContainer" style="display:none;">
+      <label for="zoomRange">Zoom: <span id="zoomValue">1</span>x</label><br>
+      <input type="range" id="zoomRange" min="1" max="5" step="0.1" value="1" oninput="cambiarZoom(this.value)">
+    </div>
+
     <div class="result-box">
       <div class="result-label">QR Detectado:</div>
-      <div id="rawResult" class="result-text">Apunte a un código QR...</div>
+      <div id="rawResult" class="result-text">Apunta a un código QR...</div>
       
-      <div class="result-label" style="margin-top:8px;">Texto extraído (tras '?'):</div>
+      <div class="result-label" style="margin-top:6px;">Texto extraído (tras '?'):</div>
       <div id="extractedResult" class="extracted-text">Ninguno</div>
     </div>
 
     <div class="btn-group">
-      <button id="saveBtn" class="btn btn-extract" onclick="saveExtractedData()" disabled>Guardar parámetro extraído</button>
-      <button id="downloadBtn" class="btn btn-download" onclick="downloadCSV()" disabled>Descargar historial (CSV)</button>
+      <button id="saveBtn" class="btn btn-extract" onclick="saveExtractedData()" disabled>Guardar parámetro</button>
+      <button id="downloadBtn" class="btn btn-download" onclick="downloadCSV()" disabled>Descargar Historial (CSV)</button>
     </div>
 
     <div class="history-box" id="historyBox">
@@ -195,9 +207,111 @@
     const saveBtn = document.getElementById('saveBtn');
     const downloadBtn = document.getElementById('downloadBtn');
     const historyBox = document.getElementById('historyBox');
+    const zoomContainer = document.getElementById('zoomContainer');
+    const zoomRange = document.getElementById('zoomRange');
+    const zoomValue = document.getElementById('zoomValue');
 
     let currentRawData = "";
     let currentExtractedData = "";
     let savedList = [];
+    let videoTrack = null;
 
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment
+    async function iniciarCamara() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" }
+        });
+        video.srcObject = stream;
+        video.setAttribute("playsinline", true);
+        video.play();
+
+        // Obtenemos la pista de vídeo para controlar el zoom si el móvil lo soporta
+        videoTrack = stream.getVideoTracks()[0];
+        const capacidades = videoTrack.getCapabilities();
+
+        if (capacidades.zoom) {
+          zoomRange.min = capacidades.zoom.min;
+          zoomRange.max = capacidades.zoom.max;
+          zoomRange.step = capacidades.zoom.step || 0.1;
+          zoomRange.value = capacidades.zoom.min;
+          zoomContainer.style.display = "block";
+        }
+
+        requestAnimationFrame(escanearQR);
+      } catch (error) {
+        alert("Error al acceder a la cámara: " + error.message);
+      }
+    }
+
+    async function cambiarZoom(valor) {
+      zoomValue.innerText = valor;
+      if (videoTrack) {
+        try {
+          await videoTrack.applyConstraints({
+            advanced: [{ zoom: parseFloat(valor) }]
+          });
+        } catch (err) {
+          console.log("El zoom no es compatible en este dispositivo", err);
+        }
+      }
+    }
+
+    function escanearQR() {
+      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        canvasElement.width = video.videoWidth;
+        canvasElement.height = video.videoHeight;
+        canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+        
+        const imageData = canvas.getImageData(0, 0, canvasElement.width, canvasElement.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: "dontInvert",
+        });
+
+        if (code) {
+          currentRawData = code.data;
+          rawResultEl.innerText = currentRawData;
+
+          // Extraer parámetros después del símbolo '?'
+          if (currentRawData.includes('?')) {
+            const partes = currentRawData.split('?');
+            currentExtractedData = partes[1];
+          } else {
+            currentExtractedData = currentRawData;
+          }
+
+          extractedResultEl.innerText = currentExtractedData;
+          saveBtn.disabled = false;
+        }
+      }
+      requestAnimationFrame(escanearQR);
+    }
+
+    function saveExtractedData() {
+      if (!currentExtractedData) return;
+      savedList.push(currentExtractedData);
+      
+      // Actualizar caja de historial
+      historyBox.innerHTML = `<div class="result-label">Historial de guardados (${savedList.length}):</div>`;
+      savedList.forEach((item, index) => {
+        historyBox.innerHTML += `<div class="history-item">${index + 1}. ${item}</div>`;
+      });
+
+      downloadBtn.disabled = false;
+    }
+
+    function downloadCSV() {
+      let csvContent = "data:text/csv;charset=utf-8,ParametroExtraido\n" + savedList.join("\n");
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", "historial_qr.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    // Arrancar la cámara al cargar la página
+    window.addEventListener('load', iniciarCamara);
+  </script>
+</body>
+</html>
